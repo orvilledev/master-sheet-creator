@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "master-sheet-creator"
+version = "0.1.0"
+description = "Streamlit app to filter and export spreadsheet columns"
+requires-python = ">=3.10"
+dependencies = [
+    "streamlit>=1.28.0",
+    "pandas>=2.0.0",
+    "openpyxl>=3.1.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
