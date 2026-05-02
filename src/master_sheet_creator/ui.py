@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import streamlit as st
 
-from .columns import subset_columns
-from .constants import STREAMLIT_UPLOAD_TYPES
+from .columns import dataframe_fixed_output, preset_columns_present
+from .constants import OUTPUT_COLUMN_ORDER, STREAMLIT_UPLOAD_TYPES
 from .exporter import ExportFormat, dataframe_to_bytes
 from .loader import FileParseError, UnsupportedFileError, load_uploaded_file
 
@@ -19,7 +19,8 @@ def render_app() -> None:
     )
     st.title("Master Sheet Creator")
     st.caption(
-        "Upload a spreadsheet, pick the columns you need, and download a new file."
+        "Upload your NetSuite-style export (.xls XML, .xlsx, or .csv). "
+        "The download uses the fixed column layout below (missing columns are left blank)."
     )
     _render_upload_flow()
 
@@ -28,11 +29,11 @@ def _render_upload_flow() -> None:
     uploaded = st.file_uploader(
         "Upload spreadsheet",
         type=STREAMLIT_UPLOAD_TYPES,
-        help="Supported formats: CSV (.csv) and Excel (.xlsx).",
+        help="Supports CSV, Excel .xlsx, and .xls (including Excel 2003 XML saved as .xls).",
     )
 
     if uploaded is None:
-        st.info("Upload a CSV or Excel file to begin.")
+        st.info("Upload an export file to begin.")
         return
 
     try:
@@ -44,26 +45,26 @@ def _render_upload_flow() -> None:
         st.error(str(err))
         return
 
-    st.subheader("Preview (first 50 rows)")
+    present, missing_preset = preset_columns_present(OUTPUT_COLUMN_ORDER, df.columns)
+    st.subheader("Preview (first 50 rows — raw upload)")
     st.dataframe(df.head(50), use_container_width=True)
 
-    all_columns = list(df.columns)
-    selected = st.multiselect(
-        "Columns to include in the output",
-        options=all_columns,
-        default=all_columns,
-        format_func=str,
-    )
+    with st.expander("Output column layout (fixed)"):
+        st.write(
+            f"**{len(present)} / {len(OUTPUT_COLUMN_ORDER)}** preset columns found in this file."
+        )
+        if missing_preset:
+            st.warning(
+                "These preset columns were **not** in the upload (they will be empty in the export): "
+                + ", ".join(f"`{c}`" for c in missing_preset)
+            )
+        else:
+            st.success("All preset columns are present in the upload.")
 
-    if not selected:
-        st.warning("Choose at least one column to export.")
-        return
+    output_df = dataframe_fixed_output(df, OUTPUT_COLUMN_ORDER)
 
-    try:
-        output_df = subset_columns(df, selected)
-    except KeyError as err:
-        st.error(str(err))
-        return
+    st.subheader("Export preview (first 25 rows)")
+    st.dataframe(output_df.head(25), use_container_width=True)
 
     fmt = st.radio(
         "Output format",

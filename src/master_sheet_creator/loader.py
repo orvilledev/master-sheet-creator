@@ -7,6 +7,7 @@ from io import BytesIO
 import pandas as pd
 
 from .constants import UPLOAD_EXTENSIONS
+from .xml_spreadsheet import load_xml_spreadsheet
 
 
 class UnsupportedFileError(ValueError):
@@ -23,6 +24,10 @@ def extension_for(filename: str) -> str:
         if lower.endswith(ext):
             return ext
     return ""
+
+
+def _starts_with_xml_declaration(raw_bytes: bytes) -> bool:
+    return raw_bytes.lstrip().startswith(b"<?xml")
 
 
 def load_uploaded_file(filename: str, raw_bytes: bytes) -> pd.DataFrame:
@@ -48,6 +53,21 @@ def load_uploaded_file(filename: str, raw_bytes: bytes) -> pd.DataFrame:
             return pd.read_csv(buffer)
         if ext == ".xlsx":
             return pd.read_excel(buffer, engine="openpyxl")
+        if ext == ".xls":
+            if _starts_with_xml_declaration(raw_bytes):
+                try:
+                    return load_xml_spreadsheet(raw_bytes)
+                except ValueError as err:
+                    raise FileParseError(str(err)) from err
+            try:
+                return pd.read_excel(buffer, engine="xlrd")
+            except ImportError as err:
+                raise FileParseError(
+                    "Binary .xls requires the optional dependency 'xlrd'. "
+                    "Install xlrd, or export the file as .xlsx."
+                ) from err
+    except FileParseError:
+        raise
     except Exception as err:
         raise FileParseError(f"Failed to parse file as {ext}: {err}") from err
 
