@@ -7,7 +7,7 @@ from io import BytesIO
 
 import pandas as pd
 from openpyxl import load_workbook
-from openpyxl.styles import PatternFill
+from openpyxl.styles import Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 
 from .constants import CSV_ENCODING, HEADER_FILL_HEX_BY_COLUMN, LONG_NUMERIC_ID_COLUMNS
@@ -60,6 +60,27 @@ def _pattern_fill(hex_rgb: str) -> PatternFill:
     return PatternFill(patternType="solid", fgColor=hex_rgb)
 
 
+_HEADER_WRAP_ALIGN = Alignment(
+    wrap_text=True,
+    vertical="center",
+    horizontal="center",
+)
+_DATA_WRAP_ALIGN = Alignment(wrap_text=True, vertical="top", horizontal="left")
+
+
+def _apply_wrap_text_alignment(workbook) -> None:
+    """Enable Wrap Text on all cells (headers centered like the template screenshots)."""
+    ws = workbook["Sheet1"]
+    for row in ws.iter_rows(
+        min_row=1,
+        max_row=ws.max_row,
+        min_col=1,
+        max_col=ws.max_column,
+    ):
+        for cell in row:
+            cell.alignment = _HEADER_WRAP_ALIGN if cell.row == 1 else _DATA_WRAP_ALIGN
+
+
 def _apply_header_row_fills(workbook, *, column_names: list[str]) -> None:
     """Apply template header colors (``.xlsx`` only)."""
     ws = workbook["Sheet1"]
@@ -82,6 +103,7 @@ def _finalize_xlsx_bytes(raw: BytesIO, *, column_names: list[str]) -> bytes:
     wb = load_workbook(raw)
     _rewrite_openpyxl_long_id_cells(wb, column_names=column_names)
     _apply_header_row_fills(wb, column_names=column_names)
+    _apply_wrap_text_alignment(wb)
     out = BytesIO()
     wb.save(out)
     return out.getvalue()
