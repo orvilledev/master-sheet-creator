@@ -16,7 +16,9 @@ from .constants import (
     GROUP_SEPARATOR_AFTER_HEADERS,
     GROUP_SEPARATOR_COLUMN_WIDTH,
     GROUP_SEPARATOR_FILL_HEX,
+    HEADER_COLUMN_WIDTH_PX,
     HEADER_FILL_HEX_BY_COLUMN,
+    HEADER_ROW_HEIGHT_PX,
     LONG_NUMERIC_ID_COLUMNS,
 )
 from .id_format import coerce_dataframe_long_ids, plain_id_string
@@ -91,6 +93,24 @@ def _enforce_separator_widths(ws, separator_cols: set[int]) -> None:
     """Re-apply narrow width (pandas / merges can reset column_dimensions)."""
     for c in separator_cols:
         ws.column_dimensions[get_column_letter(c)].width = GROUP_SEPARATOR_COLUMN_WIDTH
+
+
+def _apply_header_dimensions(ws, separator_cols: set[int]) -> None:
+    """
+    Size the header row to match the template (87×146 px at 96dpi).
+
+    Row height is set in **points** (openpyxl); column width in Excel **character units**
+    (approximate mapping from pixels for default-font columns). Separator columns stay narrow.
+    """
+    # Pixels → row height in points (Excel UI px @ 96dpi).
+    ws.row_dimensions[1].height = HEADER_ROW_HEIGHT_PX * 72.0 / 96.0
+
+    # Pixels → Excel column width (common approximation for Calibri-scale columns).
+    col_w = max(8.43, (HEADER_COLUMN_WIDTH_PX - 5.0) / 7.0)
+    for c in range(1, ws.max_column + 1):
+        if c in separator_cols:
+            continue
+        ws.column_dimensions[get_column_letter(c)].width = col_w
 
 
 def _repaint_separator_columns_to_last_row(ws, separator_cols: set[int]) -> None:
@@ -179,8 +199,9 @@ def _finalize_xlsx_bytes(raw: BytesIO) -> bytes:
     _rewrite_openpyxl_long_id_cells(wb)
     _apply_header_row_fills(wb)
     _apply_wrap_text_alignment(wb, skip_columns=sep_cols)
-    _enforce_separator_widths(wb["Sheet1"], sep_cols)
     _repaint_separator_columns_to_last_row(wb["Sheet1"], sep_cols)
+    _apply_header_dimensions(wb["Sheet1"], sep_cols)
+    _enforce_separator_widths(wb["Sheet1"], sep_cols)
     out = BytesIO()
     wb.save(out)
     return out.getvalue()

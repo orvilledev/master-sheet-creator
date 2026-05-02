@@ -25,6 +25,11 @@ GROUP_SEPARATOR_AFTER_HEADERS: tuple[str, ...] = (
 GROUP_SEPARATOR_FILL_HEX: str = "002060"
 GROUP_SEPARATOR_COLUMN_WIDTH: float = 2.25
 
+# Header row box size (matches template): width × height in screen pixels @ 96dpi.
+# Excel stores row height in points and column width in character units — see exporter conversion.
+HEADER_COLUMN_WIDTH_PX: float = 87
+HEADER_ROW_HEIGHT_PX: float = 146
+
 # Excel (.xlsx) header row fills — keys match OUTPUT_COLUMN_ORDER exactly (ARGB-ish hex, no #).
 # Palette aligned with format.xlsx / screenshots (dates in labels are ignored for matching).
 HEADER_FILL_HEX_BY_COLUMN: dict[str, str] = {
