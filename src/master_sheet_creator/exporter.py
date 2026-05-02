@@ -7,7 +7,7 @@ from io import BytesIO
 
 import pandas as pd
 from openpyxl import load_workbook
-from openpyxl.styles import Alignment, PatternFill
+from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from .constants import CSV_ENCODING, HEADER_FILL_HEX_BY_COLUMN, LONG_NUMERIC_ID_COLUMNS
@@ -65,10 +65,11 @@ _HEADER_WRAP_ALIGN = Alignment(
     vertical="center",
     horizontal="center",
 )
+_HEADER_FONT_BOLD = Font(bold=True)
 
 
 def _apply_wrap_text_alignment(workbook) -> None:
-    """Enable Wrap Text on header row only (row 1); data rows keep default alignment."""
+    """Bold header row and enable Wrap Text on row 1 only; data rows unchanged."""
     ws = workbook["Sheet1"]
     for row in ws.iter_rows(
         min_row=1,
@@ -78,6 +79,7 @@ def _apply_wrap_text_alignment(workbook) -> None:
     ):
         for cell in row:
             cell.alignment = _HEADER_WRAP_ALIGN
+            cell.font = _HEADER_FONT_BOLD
 
 
 def _apply_header_row_fills(workbook, *, column_names: list[str]) -> None:
