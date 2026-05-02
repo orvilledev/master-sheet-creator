@@ -6,9 +6,10 @@ from enum import Enum
 from io import BytesIO
 
 import pandas as pd
+from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 
-from .constants import CSV_ENCODING, LONG_NUMERIC_ID_COLUMNS
+from .constants import CSV_ENCODING, HEADER_FILL_HEX_BY_COLUMN, LONG_NUMERIC_ID_COLUMNS
 from .id_format import coerce_dataframe_long_ids, plain_id_string
 
 # Invisible LTR mark — Excel keeps the cell as text; digits stay visible without E+ notation.
@@ -53,6 +54,26 @@ def _rewrite_openpyxl_long_id_cells(workbook, *, column_names: list[str]) -> Non
             cell.number_format = "@"
 
 
+_HEADER_FILL_CACHE: dict[str, PatternFill] = {}
+
+
+def _pattern_fill(hex_rgb: str) -> PatternFill:
+    if hex_rgb not in _HEADER_FILL_CACHE:
+        _HEADER_FILL_CACHE[hex_rgb] = PatternFill(fill_type="solid", fgColor=hex_rgb)
+    return _HEADER_FILL_CACHE[hex_rgb]
+
+
+def _apply_header_row_fills(workbook, *, column_names: list[str]) -> None:
+    """Apply template header colors (``.xlsx`` only)."""
+    ws = workbook["Sheet1"]
+    name_to_idx = {name: i + 1 for i, name in enumerate(column_names)}
+    for col_name, hex_rgb in HEADER_FILL_HEX_BY_COLUMN.items():
+        if col_name not in name_to_idx:
+            continue
+        letter = get_column_letter(name_to_idx[col_name])
+        ws[f"{letter}1"].fill = _pattern_fill(hex_rgb)
+
+
 def _csv_text_for_excel_open(value: object) -> str:
     """
     Excel's CSV importer treats long digit fields as numbers (scientific notation).
@@ -92,6 +113,7 @@ def dataframe_to_bytes(df: pd.DataFrame, fmt: ExportFormat) -> tuple[bytes, str,
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         export_df.to_excel(writer, index=False, sheet_name="Sheet1")
         _rewrite_openpyxl_long_id_cells(writer.book, column_names=cols_list)
+        _apply_header_row_fills(writer.book, column_names=cols_list)
 
     return buffer.getvalue(), (
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
