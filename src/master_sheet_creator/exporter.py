@@ -65,20 +65,19 @@ _HEADER_WRAP_ALIGN = Alignment(
     vertical="center",
     horizontal="center",
 )
-_DATA_WRAP_ALIGN = Alignment(wrap_text=True, vertical="top", horizontal="left")
 
 
 def _apply_wrap_text_alignment(workbook) -> None:
-    """Enable Wrap Text on all cells (headers centered like the template screenshots)."""
+    """Enable Wrap Text on header row only (row 1); data rows keep default alignment."""
     ws = workbook["Sheet1"]
     for row in ws.iter_rows(
         min_row=1,
-        max_row=ws.max_row,
+        max_row=1,
         min_col=1,
         max_col=ws.max_column,
     ):
         for cell in row:
-            cell.alignment = _HEADER_WRAP_ALIGN if cell.row == 1 else _DATA_WRAP_ALIGN
+            cell.alignment = _HEADER_WRAP_ALIGN
 
 
 def _apply_header_row_fills(workbook, *, column_names: list[str]) -> None:
