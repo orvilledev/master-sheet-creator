@@ -20,9 +20,8 @@ def render_app() -> None:
     st.title("Master Sheet Creator")
     st.caption(
         "Upload your NetSuite-style export (.xls XML, .xlsx, or .csv). "
-        "The download matches your **format.xlsx** layout (122 columns); "
-        "fields not in the upload are left blank. **Every row** is included — "
-        "previews are shortened. For long **External ID** / **UPC** values, prefer **Excel (.xlsx)**."
+        "The download is always **Excel (.xlsx)** matching your **format.xlsx** layout (122 columns); "
+        "fields not in the upload are left blank. **Every row** is included — previews are shortened."
     )
     _render_upload_flow()
 
@@ -77,18 +76,9 @@ def _render_upload_flow() -> None:
     st.subheader("Export preview (first 25 rows only)")
     st.dataframe(output_df.head(25), use_container_width=True)
 
-    fmt = st.radio(
-        "Output format",
-        options=list(ExportFormat),
-        format_func=lambda f: "CSV (.csv)"
-        if f == ExportFormat.CSV
-        else "Excel (.xlsx)",
-        horizontal=True,
-    )
-
-    data, mime, default_name = dataframe_to_bytes(output_df, fmt)
+    data, mime, default_name = dataframe_to_bytes(output_df, ExportFormat.XLSX)
     st.download_button(
-        "Download formatted file",
+        "Download Excel (.xlsx)",
         data=data,
         file_name=default_name,
         mime=mime,

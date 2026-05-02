@@ -6,6 +6,7 @@ from enum import Enum
 from io import BytesIO
 
 import pandas as pd
+from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 from openpyxl.utils import get_column_letter
 
@@ -54,13 +55,9 @@ def _rewrite_openpyxl_long_id_cells(workbook, *, column_names: list[str]) -> Non
             cell.number_format = "@"
 
 
-_HEADER_FILL_CACHE: dict[str, PatternFill] = {}
-
-
 def _pattern_fill(hex_rgb: str) -> PatternFill:
-    if hex_rgb not in _HEADER_FILL_CACHE:
-        _HEADER_FILL_CACHE[hex_rgb] = PatternFill(fill_type="solid", fgColor=hex_rgb)
-    return _HEADER_FILL_CACHE[hex_rgb]
+    """New PatternFill per application — avoid sharing mutable styles across cells/workbooks."""
+    return PatternFill(patternType="solid", fgColor=hex_rgb)
 
 
 def _apply_header_row_fills(workbook, *, column_names: list[str]) -> None:
@@ -70,8 +67,24 @@ def _apply_header_row_fills(workbook, *, column_names: list[str]) -> None:
     for col_name, hex_rgb in HEADER_FILL_HEX_BY_COLUMN.items():
         if col_name not in name_to_idx:
             continue
-        letter = get_column_letter(name_to_idx[col_name])
-        ws[f"{letter}1"].fill = _pattern_fill(hex_rgb)
+        col_i = name_to_idx[col_name]
+        letter = get_column_letter(col_i)
+        cell = ws[f"{letter}1"]
+        cell.fill = _pattern_fill(hex_rgb)
+
+
+def _finalize_xlsx_bytes(raw: BytesIO, *, column_names: list[str]) -> bytes:
+    """
+    Reload and re-save with openpyxl so fills survive pandas writer close, then re-apply
+    styles (some pandas/openpyxl combinations drop PatternFill on first save).
+    """
+    raw.seek(0)
+    wb = load_workbook(raw)
+    _rewrite_openpyxl_long_id_cells(wb, column_names=column_names)
+    _apply_header_row_fills(wb, column_names=column_names)
+    out = BytesIO()
+    wb.save(out)
+    return out.getvalue()
 
 
 def _csv_text_for_excel_open(value: object) -> str:
@@ -115,6 +128,8 @@ def dataframe_to_bytes(df: pd.DataFrame, fmt: ExportFormat) -> tuple[bytes, str,
         _rewrite_openpyxl_long_id_cells(writer.book, column_names=cols_list)
         _apply_header_row_fills(writer.book, column_names=cols_list)
 
-    return buffer.getvalue(), (
+    xlsx_bytes = _finalize_xlsx_bytes(buffer, column_names=cols_list)
+
+    return xlsx_bytes, (
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     ), "export.xlsx"
