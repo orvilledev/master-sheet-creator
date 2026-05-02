@@ -6,6 +6,9 @@ STREAMLIT_UPLOAD_TYPES = ["csv", "xlsx", "xls"]
 # UTF-8 with BOM helps Excel on Windows recognize UTF-8 CSV correctly.
 CSV_ENCODING = "utf-8-sig"
 
+# Export as plain text (never scientific notation) — Excel reads long IDs as numbers otherwise.
+LONG_NUMERIC_ID_COLUMNS: frozenset[str] = frozenset({"External ID", "UPC Code"})
+
 # Columns written to the export — matches ``format.xlsx`` header row (122 cols).
 # Columns absent from the upload are emitted blank; order is preserved.
 OUTPUT_COLUMN_ORDER: tuple[str, ...] = (
