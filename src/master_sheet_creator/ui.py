@@ -21,8 +21,8 @@ def render_app() -> None:
     st.caption(
         "Upload your NetSuite-style export (.xls XML, .xlsx, or .csv). "
         "The download matches your **format.xlsx** layout (122 columns); "
-        "fields not in the upload are left blank. **Every row** is included in the file — "
-        "only the on-screen previews are shortened."
+        "fields not in the upload are left blank. **Every row** is included — "
+        "previews are shortened. For long **External ID** / **UPC** values, prefer **Excel (.xlsx)**."
     )
     _render_upload_flow()
 

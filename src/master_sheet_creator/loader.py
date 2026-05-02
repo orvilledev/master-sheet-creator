@@ -7,6 +7,7 @@ from io import BytesIO
 import pandas as pd
 
 from .constants import UPLOAD_EXTENSIONS
+from .id_format import coerce_dataframe_long_ids
 from .xml_spreadsheet import load_xml_spreadsheet
 
 
@@ -48,27 +49,31 @@ def load_uploaded_file(filename: str, raw_bytes: bytes) -> pd.DataFrame:
         )
 
     buffer = BytesIO(raw_bytes)
+
     try:
         if ext == ".csv":
-            return pd.read_csv(buffer)
-        if ext == ".xlsx":
-            return pd.read_excel(buffer, engine="openpyxl")
-        if ext == ".xls":
+            df = pd.read_csv(buffer)
+        elif ext == ".xlsx":
+            df = pd.read_excel(buffer, engine="openpyxl")
+        elif ext == ".xls":
             if _starts_with_xml_declaration(raw_bytes):
                 try:
-                    return load_xml_spreadsheet(raw_bytes)
+                    df = load_xml_spreadsheet(raw_bytes)
                 except ValueError as err:
                     raise FileParseError(str(err)) from err
-            try:
-                return pd.read_excel(buffer, engine="xlrd")
-            except ImportError as err:
-                raise FileParseError(
-                    "Binary .xls requires the optional dependency 'xlrd'. "
-                    "Install xlrd, or export the file as .xlsx."
-                ) from err
+            else:
+                try:
+                    df = pd.read_excel(buffer, engine="xlrd")
+                except ImportError as err:
+                    raise FileParseError(
+                        "Binary .xls requires the optional dependency 'xlrd'. "
+                        "Install xlrd, or export the file as .xlsx."
+                    ) from err
+        else:
+            raise UnsupportedFileError(f"No loader registered for {ext!r}")
     except FileParseError:
         raise
     except Exception as err:
         raise FileParseError(f"Failed to parse file as {ext}: {err}") from err
 
-    raise UnsupportedFileError(f"No loader registered for {ext!r}")
+    return coerce_dataframe_long_ids(df)

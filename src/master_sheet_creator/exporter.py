@@ -5,11 +5,14 @@ from __future__ import annotations
 from enum import Enum
 from io import BytesIO
 
-import numpy as np
 import pandas as pd
 from openpyxl.utils import get_column_letter
 
 from .constants import CSV_ENCODING, LONG_NUMERIC_ID_COLUMNS
+from .id_format import coerce_dataframe_long_ids, plain_id_string
+
+# Invisible LTR mark — Excel keeps the cell as text; digits stay visible without E+ notation.
+_XLSX_TEXT_PREFIX = "\u200e"
 
 
 class ExportFormat(str, Enum):
@@ -22,53 +25,45 @@ def _export_frame(df: pd.DataFrame) -> pd.DataFrame:
     return df.fillna("")
 
 
-def _plain_id_string(value: object) -> str:
-    """Convert cell values to full digit/string form — avoids Excel scientific notation."""
-    if value == "":
-        return ""
-    try:
-        if pd.isna(value):
-            return ""
-    except TypeError:
-        pass
+def _rewrite_openpyxl_long_id_cells(workbook, *, column_names: list[str]) -> None:
+    """
+    Open Excel sheet and force ID columns to real text cells.
 
-    if isinstance(value, str):
-        return value.strip()
-
-    if isinstance(value, bool):
-        return str(value)
-
-    if isinstance(value, (np.integer, int)):
-        return str(int(value))
-
-    if isinstance(value, (np.floating, float)):
-        fv = float(value)
-        if np.isfinite(fv):
-            r = round(fv)
-            if abs(fv - r) < 1e-6:
-                return str(int(r))
-        return str(value)
-
-    return str(value).strip()
-
-
-def _apply_long_id_text_columns(df: pd.DataFrame) -> pd.DataFrame:
-    out = df.copy()
-    for col in LONG_NUMERIC_ID_COLUMNS:
-        if col in out.columns:
-            out[col] = out[col].map(_plain_id_string)
-    return out
-
-
-def _set_xlsx_text_format(workbook, *, column_names: list[str]) -> None:
+    pandas/to_excel can still write numeric types; overwriting values here guarantees
+    Excel displays full digits (plus ``number_format = '@'``).
+    """
     ws = workbook["Sheet1"]
     name_to_idx = {name: i + 1 for i, name in enumerate(column_names)}
+
     for col_name in LONG_NUMERIC_ID_COLUMNS:
         if col_name not in name_to_idx:
             continue
         letter = get_column_letter(name_to_idx[col_name])
+        ws[f"{letter}1"].number_format = "@"
+
         for row in range(2, ws.max_row + 1):
-            ws[f"{letter}{row}"].number_format = "@"
+            cell = ws[f"{letter}{row}"]
+            raw = cell.value
+            if raw is None or raw == "":
+                cell.value = ""
+            else:
+                text = plain_id_string(raw)
+                # Prefix stops Excel from treating digit-only strings as numbers on open.
+                cell.value = _XLSX_TEXT_PREFIX + text if text else ""
+            cell.number_format = "@"
+
+
+def _csv_text_for_excel_open(value: object) -> str:
+    """
+    Excel's CSV importer treats long digit fields as numbers (scientific notation).
+
+    A text formula like ``="199230130516"`` forces the full value as text in Excel.
+    """
+    s = plain_id_string(value)
+    if s == "":
+        return ""
+    escaped = s.replace('"', '""')
+    return f'="{escaped}"'
 
 
 def dataframe_to_bytes(df: pd.DataFrame, fmt: ExportFormat) -> tuple[bytes, str, str]:
@@ -81,18 +76,22 @@ def dataframe_to_bytes(df: pd.DataFrame, fmt: ExportFormat) -> tuple[bytes, str,
     mime_type : str
     default_filename : str
     """
-    export_df = _apply_long_id_text_columns(_export_frame(df))
+    export_df = coerce_dataframe_long_ids(_export_frame(df))
     cols_list = list(export_df.columns)
 
     if fmt == ExportFormat.CSV:
+        csv_df = export_df.copy()
+        for col in LONG_NUMERIC_ID_COLUMNS:
+            if col in csv_df.columns:
+                csv_df[col] = csv_df[col].map(_csv_text_for_excel_open)
         buffer = BytesIO()
-        export_df.to_csv(buffer, index=False, encoding=CSV_ENCODING)
+        csv_df.to_csv(buffer, index=False, encoding=CSV_ENCODING)
         return buffer.getvalue(), "text/csv; charset=utf-8", "export.csv"
 
     buffer = BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         export_df.to_excel(writer, index=False, sheet_name="Sheet1")
-        _set_xlsx_text_format(writer.book, column_names=cols_list)
+        _rewrite_openpyxl_long_id_cells(writer.book, column_names=cols_list)
 
     return buffer.getvalue(), (
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
