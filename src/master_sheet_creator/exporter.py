@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from enum import Enum
 from io import BytesIO
 
@@ -10,7 +11,14 @@ from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from .constants import CSV_ENCODING, HEADER_FILL_HEX_BY_COLUMN, LONG_NUMERIC_ID_COLUMNS
+from .constants import (
+    CSV_ENCODING,
+    GROUP_SEPARATOR_AFTER_HEADERS,
+    GROUP_SEPARATOR_COLUMN_WIDTH,
+    GROUP_SEPARATOR_FILL_HEX,
+    HEADER_FILL_HEX_BY_COLUMN,
+    LONG_NUMERIC_ID_COLUMNS,
+)
 from .id_format import coerce_dataframe_long_ids, plain_id_string
 
 # Invisible LTR mark — Excel keeps the cell as text; digits stay visible without E+ notation.
@@ -27,30 +35,96 @@ def _export_frame(df: pd.DataFrame) -> pd.DataFrame:
     return df.fillna("")
 
 
-def _rewrite_openpyxl_long_id_cells(workbook, *, column_names: list[str]) -> None:
-    """
-    Open Excel sheet and force ID columns to real text cells.
+def _column_index_for_header(ws, header: str) -> int | None:
+    """1-based column index where row 1 equals ``header`` (first match)."""
+    for c in range(1, ws.max_column + 1):
+        v = ws.cell(1, c).value
+        if v == header:
+            return c
+    return None
 
-    pandas/to_excel can still write numeric types; overwriting values here guarantees
-    Excel displays full digits (plus ``number_format = '@'``).
+
+def _sheet_bottom_row(ws) -> int:
+    """Last row index that contains data (openpyxl ``max_row`` plus dimension fallback)."""
+    last = ws.max_row or 1
+    dim = ws.calculate_dimension()
+    if dim and ":" in dim:
+        corner = dim.split(":")[-1].strip()
+        m = re.search(r"(\d+)$", corner)
+        if m:
+            last = max(last, int(m.group(1)))
+    return last
+
+
+def _insert_group_separator_columns(workbook) -> set[int]:
+    """
+    Insert narrow navy columns between header groups. Inserts from right to left.
+    Returns final 1-based indices of separator columns (for skipping header styling).
     """
     ws = workbook["Sheet1"]
-    name_to_idx = {name: i + 1 for i, name in enumerate(column_names)}
+    insert_before: list[int] = []
+    for anchor in GROUP_SEPARATOR_AFTER_HEADERS:
+        idx = _column_index_for_header(ws, anchor)
+        if idx is not None:
+            insert_before.append(idx + 1)
+
+    sep_fill = PatternFill(patternType="solid", fgColor=GROUP_SEPARATOR_FILL_HEX)
+    separator_final_cols: list[int] = []
+
+    for pos in sorted(set(insert_before), reverse=True):
+        ws.insert_cols(pos, amount=1)
+        separator_final_cols = [c + 1 if c >= pos else c for c in separator_final_cols]
+        separator_final_cols.append(pos)
+
+        letter = get_column_letter(pos)
+        ws.column_dimensions[letter].width = GROUP_SEPARATOR_COLUMN_WIDTH
+        bottom = _sheet_bottom_row(ws)
+        for row_idx in range(1, bottom + 1):
+            cell = ws.cell(row_idx, pos)
+            cell.value = None
+            cell.fill = sep_fill
+
+    return set(separator_final_cols)
+
+
+def _enforce_separator_widths(ws, separator_cols: set[int]) -> None:
+    """Re-apply narrow width (pandas / merges can reset column_dimensions)."""
+    for c in separator_cols:
+        ws.column_dimensions[get_column_letter(c)].width = GROUP_SEPARATOR_COLUMN_WIDTH
+
+
+def _repaint_separator_columns_to_last_row(ws, separator_cols: set[int]) -> None:
+    """Navy fill for every row through the sheet's last used row (styling can strip fills)."""
+    sep_fill = PatternFill(patternType="solid", fgColor=GROUP_SEPARATOR_FILL_HEX)
+    last = _sheet_bottom_row(ws)
+    for c in separator_cols:
+        for r in range(1, last + 1):
+            cell = ws.cell(r, c)
+            cell.value = None
+            cell.fill = sep_fill
+
+
+def _rewrite_openpyxl_long_id_cells(workbook) -> None:
+    """
+    Open Excel sheet and force ID columns to real text cells (resolve columns by header text).
+    """
+    ws = workbook["Sheet1"]
 
     for col_name in LONG_NUMERIC_ID_COLUMNS:
-        if col_name not in name_to_idx:
+        col_i = _column_index_for_header(ws, col_name)
+        if col_i is None:
             continue
-        letter = get_column_letter(name_to_idx[col_name])
+        letter = get_column_letter(col_i)
         ws[f"{letter}1"].number_format = "@"
 
-        for row in range(2, ws.max_row + 1):
+        bottom = _sheet_bottom_row(ws)
+        for row in range(2, bottom + 1):
             cell = ws[f"{letter}{row}"]
             raw = cell.value
             if raw is None or raw == "":
                 cell.value = ""
             else:
                 text = plain_id_string(raw)
-                # Prefix stops Excel from treating digit-only strings as numbers on open.
                 cell.value = _XLSX_TEXT_PREFIX + text if text else ""
             cell.number_format = "@"
 
@@ -68,8 +142,8 @@ _HEADER_WRAP_ALIGN = Alignment(
 _HEADER_FONT_BOLD = Font(bold=True)
 
 
-def _apply_wrap_text_alignment(workbook) -> None:
-    """Bold header row and enable Wrap Text on row 1 only; data rows unchanged."""
+def _apply_wrap_text_alignment(workbook, *, skip_columns: set[int]) -> None:
+    """Bold header row and Wrap Text; skip narrow navy separator columns."""
     ws = workbook["Sheet1"]
     for row in ws.iter_rows(
         min_row=1,
@@ -78,33 +152,35 @@ def _apply_wrap_text_alignment(workbook) -> None:
         max_col=ws.max_column,
     ):
         for cell in row:
+            if cell.column in skip_columns:
+                continue
             cell.alignment = _HEADER_WRAP_ALIGN
             cell.font = _HEADER_FONT_BOLD
 
 
-def _apply_header_row_fills(workbook, *, column_names: list[str]) -> None:
-    """Apply template header colors (``.xlsx`` only)."""
+def _apply_header_row_fills(workbook) -> None:
+    """Apply template header colors (resolve columns by header text)."""
     ws = workbook["Sheet1"]
-    name_to_idx = {name: i + 1 for i, name in enumerate(column_names)}
     for col_name, hex_rgb in HEADER_FILL_HEX_BY_COLUMN.items():
-        if col_name not in name_to_idx:
+        col_i = _column_index_for_header(ws, col_name)
+        if col_i is None:
             continue
-        col_i = name_to_idx[col_name]
         letter = get_column_letter(col_i)
-        cell = ws[f"{letter}1"]
-        cell.fill = _pattern_fill(hex_rgb)
+        ws[f"{letter}1"].fill = _pattern_fill(hex_rgb)
 
 
-def _finalize_xlsx_bytes(raw: BytesIO, *, column_names: list[str]) -> bytes:
+def _finalize_xlsx_bytes(raw: BytesIO) -> bytes:
     """
-    Reload and re-save with openpyxl so fills survive pandas writer close, then re-apply
-    styles (some pandas/openpyxl combinations drop PatternFill on first save).
+    Reload and re-save with openpyxl: group separators, IDs, fills, header formatting.
     """
     raw.seek(0)
     wb = load_workbook(raw)
-    _rewrite_openpyxl_long_id_cells(wb, column_names=column_names)
-    _apply_header_row_fills(wb, column_names=column_names)
-    _apply_wrap_text_alignment(wb)
+    sep_cols = _insert_group_separator_columns(wb)
+    _rewrite_openpyxl_long_id_cells(wb)
+    _apply_header_row_fills(wb)
+    _apply_wrap_text_alignment(wb, skip_columns=sep_cols)
+    _enforce_separator_widths(wb["Sheet1"], sep_cols)
+    _repaint_separator_columns_to_last_row(wb["Sheet1"], sep_cols)
     out = BytesIO()
     wb.save(out)
     return out.getvalue()
@@ -134,7 +210,6 @@ def dataframe_to_bytes(df: pd.DataFrame, fmt: ExportFormat) -> tuple[bytes, str,
     default_filename : str
     """
     export_df = coerce_dataframe_long_ids(_export_frame(df))
-    cols_list = list(export_df.columns)
 
     if fmt == ExportFormat.CSV:
         csv_df = export_df.copy()
@@ -148,10 +223,8 @@ def dataframe_to_bytes(df: pd.DataFrame, fmt: ExportFormat) -> tuple[bytes, str,
     buffer = BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         export_df.to_excel(writer, index=False, sheet_name="Sheet1")
-        _rewrite_openpyxl_long_id_cells(writer.book, column_names=cols_list)
-        _apply_header_row_fills(writer.book, column_names=cols_list)
 
-    xlsx_bytes = _finalize_xlsx_bytes(buffer, column_names=cols_list)
+    xlsx_bytes = _finalize_xlsx_bytes(buffer)
 
     return xlsx_bytes, (
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

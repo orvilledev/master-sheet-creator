@@ -9,6 +9,22 @@ CSV_ENCODING = "utf-8-sig"
 # Export as plain text (never scientific notation) — Excel reads long IDs as numbers otherwise.
 LONG_NUMERIC_ID_COLUMNS: frozenset[str] = frozenset({"External ID", "UPC Code"})
 
+# Narrow navy separator columns inserted in .xlsx after these headers (between groups).
+GROUP_SEPARATOR_AFTER_HEADERS: tuple[str, ...] = (
+    "NETSUITE LINK",
+    "ASIN 4.30.26",
+    " Amazon: Stock",
+    "AMZ TAG",
+    "has_buy_box FBM ",
+    "AMZ SALES 4.19-4.25.26",
+    "FC ON ORDER ",
+    "afn-researching-quantity (inbound inv.not avail. for sale)",
+    " afn-researching-quantity (inbound inv.not avail. for sale)",
+)
+# Dark navy blue bar (matches template separator column).
+GROUP_SEPARATOR_FILL_HEX: str = "002060"
+GROUP_SEPARATOR_COLUMN_WIDTH: float = 2.25
+
 # Excel (.xlsx) header row fills — keys match OUTPUT_COLUMN_ORDER exactly (ARGB-ish hex, no #).
 # Palette aligned with format.xlsx / screenshots (dates in labels are ignored for matching).
 HEADER_FILL_HEX_BY_COLUMN: dict[str, str] = {
