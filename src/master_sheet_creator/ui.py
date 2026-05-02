@@ -20,7 +20,9 @@ def render_app() -> None:
     st.title("Master Sheet Creator")
     st.caption(
         "Upload your NetSuite-style export (.xls XML, .xlsx, or .csv). "
-        "The download uses the fixed column layout below (missing columns are left blank)."
+        "The download matches your **format.xlsx** layout (122 columns); "
+        "fields not in the upload are left blank. **Every row** is included in the file — "
+        "only the on-screen previews are shortened."
     )
     _render_upload_flow()
 
@@ -46,24 +48,33 @@ def _render_upload_flow() -> None:
         return
 
     present, missing_preset = preset_columns_present(OUTPUT_COLUMN_ORDER, df.columns)
-    st.subheader("Preview (first 50 rows — raw upload)")
+    n_rows, n_cols = len(df), len(df.columns)
+    st.info(
+        f"**{n_rows:,}** rows × **{n_cols}** columns in your upload. "
+        f"The downloaded file will include **all {n_rows:,} rows** and **{len(OUTPUT_COLUMN_ORDER)}** output columns."
+    )
+
+    st.subheader("Preview (raw upload — first 50 rows only)")
     st.dataframe(df.head(50), use_container_width=True)
 
-    with st.expander("Output column layout (fixed)"):
+    with st.expander("Template columns matched from your upload"):
         st.write(
-            f"**{len(present)} / {len(OUTPUT_COLUMN_ORDER)}** preset columns found in this file."
+            f"**{len(present)} / {len(OUTPUT_COLUMN_ORDER)}** template columns appear in this file "
+            "(by exact header name)."
         )
         if missing_preset:
             st.warning(
-                "These preset columns were **not** in the upload (they will be empty in the export): "
-                + ", ".join(f"`{c}`" for c in missing_preset)
+                f"**{len(missing_preset)}** template column(s) are not in the upload "
+                "(they will be blank in the export)."
             )
+            with st.expander("Show missing template column names"):
+                st.text("\n".join(missing_preset))
         else:
-            st.success("All preset columns are present in the upload.")
+            st.success("All template columns are present in the upload.")
 
     output_df = dataframe_fixed_output(df, OUTPUT_COLUMN_ORDER)
 
-    st.subheader("Export preview (first 25 rows)")
+    st.subheader("Export preview (first 25 rows only)")
     st.dataframe(output_df.head(25), use_container_width=True)
 
     fmt = st.radio(

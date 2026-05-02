@@ -22,13 +22,17 @@ def dataframe_fixed_output(df: pd.DataFrame, preset: Sequence[str]) -> pd.DataFr
     Columns missing from ``df``, or present but all-null, still appear; missing
     columns are filled with empty strings so exports always include the full layout.
     """
-    out = pd.DataFrame(index=df.index)
+    series_list: list[pd.Series] = []
     for name in preset:
         if name in df.columns:
-            out[name] = df[name]
+            series_list.append(df[name].copy())
         else:
-            out[name] = pd.Series("", index=df.index, dtype=object)
-    return out
+            series_list.append(
+                pd.Series("", index=df.index, dtype=object, name=name)
+            )
+    if not series_list:
+        return pd.DataFrame(index=df.index)
+    return pd.concat(series_list, axis=1)
 
 
 def preset_columns_present(preset: Sequence[str], df_columns: Sequence) -> tuple[list[str], list[str]]:
