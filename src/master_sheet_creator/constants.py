@@ -19,7 +19,7 @@ GROUP_SEPARATOR_AFTER_UPLOAD_KEYS: tuple[str, ...] = (
     " Amazon: Stock",
     "AMZ TAG",
     "has_buy_box FBM ",
-    "AMZ SALES 4.19-4.25.26",
+    "STORE SALES 4.20-4.26.26",
     "FC ON ORDER ",
     " afn-researching-quantity (inbound inv.not avail. for sale)",
 )
