@@ -13,6 +13,7 @@ LONG_NUMERIC_ID_COLUMNS: frozenset[str] = frozenset({"External ID", "UPC Code"})
 # Narrow navy separator columns inserted in .xlsx after these headers (between groups).
 # Anchors are NetSuite/upload column names; resolved to Excel labels via OUTPUT_HEADER_DISPLAY.
 GROUP_SEPARATOR_AFTER_UPLOAD_KEYS: tuple[str, ...] = (
+    "MSRP PRICE",
     "NETSUITE LINK",
     "ASIN 4.30.26",
     " Amazon: Stock",
