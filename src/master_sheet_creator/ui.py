@@ -2,12 +2,34 @@
 
 from __future__ import annotations
 
+import pandas as pd
 import streamlit as st
 
 from .columns import dataframe_fixed_output, preset_columns_present
 from .constants import OUTPUT_COLUMN_ORDER, STREAMLIT_UPLOAD_TYPES
 from .exporter import ExportFormat, dataframe_to_bytes
 from .loader import FileParseError, UnsupportedFileError, load_uploaded_file
+
+
+def _dataframe_unique_columns_for_display(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Streamlit (PyArrow) rejects duplicate column labels; the exported Excel may repeat headers.
+
+    Second and later occurrences get `` (2)``, `` (3)``, … appended so previews render.
+    """
+    seen: dict[str, int] = {}
+    names: list[str] = []
+    for col in df.columns:
+        key = str(col)
+        if key not in seen:
+            seen[key] = 1
+            names.append(key)
+        else:
+            seen[key] += 1
+            names.append(f"{key} ({seen[key]})")
+    out = df.copy()
+    out.columns = names
+    return out
 
 
 def render_app() -> None:
@@ -74,7 +96,10 @@ def _render_upload_flow() -> None:
     output_df = dataframe_fixed_output(df, OUTPUT_COLUMN_ORDER)
 
     st.subheader("Export preview (first 25 rows only)")
-    st.dataframe(output_df.head(25), use_container_width=True)
+    st.dataframe(
+        _dataframe_unique_columns_for_display(output_df.head(25)),
+        use_container_width=True,
+    )
 
     data, mime, default_name = dataframe_to_bytes(output_df, ExportFormat.XLSX)
     st.download_button(
