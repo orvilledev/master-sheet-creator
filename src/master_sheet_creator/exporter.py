@@ -18,6 +18,8 @@ from .constants import (
     GROUP_SEPARATOR_AFTER_HEADERS,
     GROUP_SEPARATOR_COLUMN_WIDTH,
     GROUP_SEPARATOR_FILL_HEX,
+    HEADER_COLUMN_WIDTH_40PX_LABELS,
+    HEADER_COLUMN_WIDTH_INVENTORY_BLOCK_PX,
     HEADER_COLUMN_WIDTH_PX,
     HEADER_FILL_HEX_BY_COLUMN,
     HEADER_ROW_HEIGHT_PX,
@@ -137,6 +139,11 @@ def _enforce_separator_widths(ws, separator_cols: set[int]) -> None:
         ws.column_dimensions[get_column_letter(c)].width = GROUP_SEPARATOR_COLUMN_WIDTH
 
 
+def _excel_column_width_chars(px: float, *, minimum: float) -> float:
+    """Map desired column width in screen pixels (@ 96dpi) to Excel width in character units."""
+    return max(minimum, (px - 5.0) / 7.0)
+
+
 def _apply_header_dimensions(ws, separator_cols: set[int]) -> None:
     """
     Size the header row to match the template (87×146 px at 96dpi).
@@ -147,11 +154,15 @@ def _apply_header_dimensions(ws, separator_cols: set[int]) -> None:
     # Pixels → row height in points (Excel UI px @ 96dpi).
     ws.row_dimensions[1].height = HEADER_ROW_HEIGHT_PX * 72.0 / 96.0
 
-    # Pixels → Excel column width (common approximation for Calibri-scale columns).
-    col_w = max(8.43, (HEADER_COLUMN_WIDTH_PX - 5.0) / 7.0)
+    default_w = _excel_column_width_chars(HEADER_COLUMN_WIDTH_PX, minimum=8.43)
+    inv_w = _excel_column_width_chars(
+        HEADER_COLUMN_WIDTH_INVENTORY_BLOCK_PX, minimum=2.0
+    )
     for c in range(1, ws.max_column + 1):
         if c in separator_cols:
             continue
+        header = ws.cell(1, c).value
+        col_w = inv_w if header in HEADER_COLUMN_WIDTH_40PX_LABELS else default_w
         ws.column_dimensions[get_column_letter(c)].width = col_w
 
 

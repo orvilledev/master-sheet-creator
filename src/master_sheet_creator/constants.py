@@ -250,6 +250,29 @@ GROUP_SEPARATOR_AFTER_HEADERS: tuple[str, ...] = tuple(
     OUTPUT_HEADER_DISPLAY.get(k, k) for k in GROUP_SEPARATOR_AFTER_UPLOAD_KEYS
 )
 
+# Inventory-age through AFN block: narrower Excel column width (screen px @ 96dpi; see exporter mapping).
+HEADER_COLUMN_WIDTH_INVENTORY_BLOCK_PX: float = 40.0
+HEADER_COLUMN_WIDTH_40PX_ORDER_KEYS: tuple[str, ...] = (
+    " inv-age-0-to-90-days",
+    " inv-age-91-to-180-days",
+    " inv-age-181-to-270-days",
+    " inv-age-271-to-365-days",
+    " inv-age-365-plus-days",
+    "Recomened Removel+",
+    " afn-total-quantity",
+    " afn-fulfillable-quantity",
+    " afn-unsellable-quantity",
+    " afn-reserved-quantity",
+    "Reserved Customer Order",
+    " afn-inbound-working-quantity",
+    " afn-inbound-shipped-quantity",
+    " afn-inbound-receiving-quantity",
+    " afn-researching-quantity (inbound inv.not avail. for sale)",
+)
+HEADER_COLUMN_WIDTH_40PX_LABELS: frozenset[str] = frozenset(
+    OUTPUT_HEADER_DISPLAY.get(k, k) for k in HEADER_COLUMN_WIDTH_40PX_ORDER_KEYS
+)
+
 # Columns written to the export — NetSuite/upload header strings (114 cols); Excel labels may differ.
 # Columns absent from the upload are emitted blank; order is preserved.
 OUTPUT_COLUMN_ORDER: tuple[str, ...] = (
