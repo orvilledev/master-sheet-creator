@@ -21,7 +21,6 @@ GROUP_SEPARATOR_AFTER_UPLOAD_KEYS: tuple[str, ...] = (
     "has_buy_box FBM ",
     "AMZ SALES 4.19-4.25.26",
     "FC ON ORDER ",
-    "Recomened Removel+",
     " afn-researching-quantity (inbound inv.not avail. for sale)",
 )
 # Dark navy blue bar (matches template separator column).

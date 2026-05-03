@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date
 from enum import Enum
 from io import BytesIO
 
@@ -30,6 +31,30 @@ _XLSX_TEXT_PREFIX = "\u200e"
 class ExportFormat(str, Enum):
     CSV = "csv"
     XLSX = "xlsx"
+
+
+_FILENAME_FORBIDDEN_RE = re.compile(r'[<>:"/\\|?*\n\r\t]+')
+_FALLBACK_VENDOR_LABEL = "Master Sheet"
+
+
+def _sanitize_vendor_filename_segment(raw: str) -> str:
+    s = _FILENAME_FORBIDDEN_RE.sub("", raw).strip()
+    s = re.sub(r"\s+", " ", s).rstrip(" .")
+    return s[:180] if len(s) > 180 else s
+
+
+def xlsx_download_filename(df: pd.DataFrame) -> str:
+    """``{Vendor Name} {M.D.YY}.xlsx`` using the first row's ``Vendor Name`` and today's date."""
+    vendor = _FALLBACK_VENDOR_LABEL
+    if "Vendor Name" in df.columns and not df.empty:
+        cell = df["Vendor Name"].iloc[0]
+        if pd.notna(cell):
+            cleaned = _sanitize_vendor_filename_segment(str(cell))
+            if cleaned:
+                vendor = cleaned
+    today = date.today()
+    md_yy = f"{today.month}.{today.day}.{str(today.year)[-2:]}"
+    return f"{vendor} {md_yy}.xlsx"
 
 
 def _export_frame(df: pd.DataFrame) -> pd.DataFrame:
@@ -256,4 +281,4 @@ def dataframe_to_bytes(df: pd.DataFrame, fmt: ExportFormat) -> tuple[bytes, str,
 
     return xlsx_bytes, (
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    ), "export.xlsx"
+    ), xlsx_download_filename(export_df)
