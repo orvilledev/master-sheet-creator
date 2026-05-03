@@ -8,7 +8,7 @@ CSV_ENCODING = "utf-8-sig"
 
 # Export as plain text (never scientific notation) — Excel reads long IDs as numbers otherwise.
 # Keys match Excel header text after OUTPUT_HEADER_DISPLAY is applied.
-LONG_NUMERIC_ID_COLUMNS: frozenset[str] = frozenset({"External ID", "4.30.26 UPC Code"})
+LONG_NUMERIC_ID_COLUMNS: frozenset[str] = frozenset({"External ID", "UPC Code"})
 
 # Narrow navy separator columns inserted in .xlsx after these headers (between groups).
 # Anchors are NetSuite/upload column names; resolved to Excel labels via OUTPUT_HEADER_DISPLAY.
@@ -48,17 +48,12 @@ _BUY_BOX_5126 = (
 for _k in _BUY_BOX_5126:
     OUTPUT_HEADER_DISPLAY[_k] = "5.1.26 " + _k.strip()
 
-_ACTIVE_43026 = (
-    " ACTIVE/INACTIVE",
-    "FBM QTY",
-    "FBM PRICE",
-    " CURRENT SHIP TEMP (MIG-STANDARD, SHIP-ADD 9.99)",
-    " ACTIVE/INACTIVE.1",
-    "AMZ PRICE",
-    "AMZ TAG",
+# AJ–AP reference: date only ACTIVE/INACTIVE (both), CURRENT SHIP TEMP; not FBM QTY/PRICE, AMZ PRICE/TAG.
+OUTPUT_HEADER_DISPLAY[" ACTIVE/INACTIVE"] = "4.30.26 ACTIVE/INACTIVE"
+OUTPUT_HEADER_DISPLAY[" ACTIVE/INACTIVE.1"] = "4.30.26 ACTIVE/INACTIVE"
+OUTPUT_HEADER_DISPLAY[" CURRENT SHIP TEMP (MIG-STANDARD, SHIP-ADD 9.99)"] = (
+    "4.30.26 CURRENT SHIP TEMP (MIG-STANDARD, SHIP-ADD 9.99)"
 )
-for _k in _ACTIVE_43026:
-    OUTPUT_HEADER_DISPLAY[_k] = "4.30.26 " + _k.strip()
 
 _REPRICING_43026 = (
     "repricing_enabled FBA ",
@@ -149,35 +144,7 @@ OUTPUT_HEADER_DISPLAY[" afn-researching-quantity (inbound inv.not avail. for sal
 
 OUTPUT_HEADER_DISPLAY["Reserved Customer Order"] = "4.30.26 Reserved Customer Order"
 
-_NS_TAIL_43026 = (
-    "UPC Code",
-    "Price Level",
-    "Unit Price",
-    "Current Price",
-    "Average Cost",
-    "Purchase Price",
-    "MSRP",
-    "Shipping Override",
-    "Location Reorder Point",
-    "Last Markdown Date",
-    "ITEM SID",
-    "Internal ID",
-    "EXCLUDE FROM AMAZON",
-    "EXCLUDE FROM EBAY",
-    "EXCLUDE FROM MSW.COM",
-    "Last Purchase Price",
-    "Amazon Minimum Price",
-    "AMAZON MAX PRICE",
-    "FBA STORAGE TYPE",
-    "Parent",
-    "SEND TO FBA",
-    "FBA ONLY",
-    "MAP RELEASE DATE.1",
-    "ASIN",
-    "AMZ SOURCING COST",
-)
-for _k in _NS_TAIL_43026:
-    OUTPUT_HEADER_DISPLAY[_k] = "4.30.26 " + _k
+# Trailing NetSuite columns (UPC Code … AMZ SOURCING COST): no date prefix in Excel headers.
 
 # Excel (.xlsx) header row fills — keys match post-display header text (ARGB-ish hex, no #).
 # _RAW_HEADER_FILLS uses upload keys; HEADER_FILL_HEX_BY_COLUMN maps to dated labels.

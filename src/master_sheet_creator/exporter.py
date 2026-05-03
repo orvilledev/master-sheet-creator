@@ -46,6 +46,15 @@ def _column_index_for_header(ws, header: str) -> int | None:
     return None
 
 
+def _column_indices_for_header(ws, header: str) -> list[int]:
+    """1-based column indices where row 1 equals ``header`` (all matches — duplicate headers)."""
+    return [
+        c
+        for c in range(1, ws.max_column + 1)
+        if ws.cell(1, c).value == header
+    ]
+
+
 def _sheet_bottom_row(ws) -> int:
     """Last row index that contains data (openpyxl ``max_row`` plus dimension fallback)."""
     last = ws.max_row or 1
@@ -182,11 +191,9 @@ def _apply_header_row_fills(workbook) -> None:
     """Apply template header colors (resolve columns by header text)."""
     ws = workbook["Sheet1"]
     for col_name, hex_rgb in HEADER_FILL_HEX_BY_COLUMN.items():
-        col_i = _column_index_for_header(ws, col_name)
-        if col_i is None:
-            continue
-        letter = get_column_letter(col_i)
-        ws[f"{letter}1"].fill = _pattern_fill(hex_rgb)
+        for col_i in _column_indices_for_header(ws, col_name):
+            letter = get_column_letter(col_i)
+            ws[f"{letter}1"].fill = _pattern_fill(hex_rgb)
 
 
 def _finalize_xlsx_bytes(raw: BytesIO) -> bytes:
