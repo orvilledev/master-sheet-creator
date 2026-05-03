@@ -10,6 +10,7 @@ from io import BytesIO
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.styles.colors import Color
 from openpyxl.utils import get_column_letter
 
 from .constants import (
@@ -35,6 +36,13 @@ class ExportFormat(str, Enum):
 
 _FILENAME_FORBIDDEN_RE = re.compile(r'[<>:"/\\|?*\n\r\t]+')
 _FALLBACK_VENDOR_LABEL = "Master Sheet"
+
+# Workbook tab names and tab colors (ARGB hex for openpyxl ``Color``).
+_MAIN_DATA_SHEET = "UPCs"
+_SHEET_FBA_INV_STORE = "FBA INV REPORT STORE"
+_SHEET_FBA_INV_FC = "FBA INV REPORT FC"
+_TAB_COLOR_YELLOW = "FFFFFF00"
+_TAB_COLOR_PURPLE = "FF7030A0"
 
 
 def _sanitize_vendor_filename_segment(raw: str) -> str:
@@ -97,7 +105,7 @@ def _insert_group_separator_columns(workbook) -> set[int]:
     Insert narrow navy columns between header groups. Inserts from right to left.
     Returns final 1-based indices of separator columns (for skipping header styling).
     """
-    ws = workbook["Sheet1"]
+    ws = workbook[_MAIN_DATA_SHEET]
     insert_before: list[int] = []
     for anchor in GROUP_SEPARATOR_AFTER_HEADERS:
         idx = _column_index_for_header(ws, anchor)
@@ -162,7 +170,7 @@ def _rewrite_openpyxl_long_id_cells(workbook) -> None:
     """
     Open Excel sheet and force ID columns to real text cells (resolve columns by header text).
     """
-    ws = workbook["Sheet1"]
+    ws = workbook[_MAIN_DATA_SHEET]
 
     for col_name in LONG_NUMERIC_ID_COLUMNS:
         col_i = _column_index_for_header(ws, col_name)
@@ -198,7 +206,7 @@ _HEADER_FONT_BOLD = Font(bold=True)
 
 def _apply_wrap_text_alignment(workbook, *, skip_columns: set[int]) -> None:
     """Bold header row and Wrap Text; skip narrow navy separator columns."""
-    ws = workbook["Sheet1"]
+    ws = workbook[_MAIN_DATA_SHEET]
     for row in ws.iter_rows(
         min_row=1,
         max_row=1,
@@ -214,11 +222,22 @@ def _apply_wrap_text_alignment(workbook, *, skip_columns: set[int]) -> None:
 
 def _apply_header_row_fills(workbook) -> None:
     """Apply template header colors (resolve columns by header text)."""
-    ws = workbook["Sheet1"]
+    ws = workbook[_MAIN_DATA_SHEET]
     for col_name, hex_rgb in HEADER_FILL_HEX_BY_COLUMN.items():
         for col_i in _column_indices_for_header(ws, col_name):
             letter = get_column_letter(col_i)
             ws[f"{letter}1"].fill = _pattern_fill(hex_rgb)
+
+
+def _apply_workbook_sheet_tabs(wb) -> None:
+    """Rename is handled by pandas sheet name; set tab colors and add placeholder FBA sheets."""
+    wb[_MAIN_DATA_SHEET].sheet_properties.tabColor = Color(rgb=_TAB_COLOR_YELLOW)
+    if _SHEET_FBA_INV_STORE not in wb.sheetnames:
+        wb.create_sheet(_SHEET_FBA_INV_STORE)
+    if _SHEET_FBA_INV_FC not in wb.sheetnames:
+        wb.create_sheet(_SHEET_FBA_INV_FC)
+    wb[_SHEET_FBA_INV_STORE].sheet_properties.tabColor = Color(rgb=_TAB_COLOR_PURPLE)
+    wb[_SHEET_FBA_INV_FC].sheet_properties.tabColor = Color(rgb=_TAB_COLOR_PURPLE)
 
 
 def _finalize_xlsx_bytes(raw: BytesIO) -> bytes:
@@ -231,9 +250,10 @@ def _finalize_xlsx_bytes(raw: BytesIO) -> bytes:
     _rewrite_openpyxl_long_id_cells(wb)
     _apply_header_row_fills(wb)
     _apply_wrap_text_alignment(wb, skip_columns=sep_cols)
-    _repaint_separator_columns_to_last_row(wb["Sheet1"], sep_cols)
-    _apply_header_dimensions(wb["Sheet1"], sep_cols)
-    _enforce_separator_widths(wb["Sheet1"], sep_cols)
+    _repaint_separator_columns_to_last_row(wb[_MAIN_DATA_SHEET], sep_cols)
+    _apply_header_dimensions(wb[_MAIN_DATA_SHEET], sep_cols)
+    _enforce_separator_widths(wb[_MAIN_DATA_SHEET], sep_cols)
+    _apply_workbook_sheet_tabs(wb)
     out = BytesIO()
     wb.save(out)
     return out.getvalue()
@@ -275,7 +295,7 @@ def dataframe_to_bytes(df: pd.DataFrame, fmt: ExportFormat) -> tuple[bytes, str,
 
     buffer = BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        export_df.to_excel(writer, index=False, sheet_name="Sheet1")
+        export_df.to_excel(writer, index=False, sheet_name=_MAIN_DATA_SHEET)
 
     xlsx_bytes = _finalize_xlsx_bytes(buffer)
 
