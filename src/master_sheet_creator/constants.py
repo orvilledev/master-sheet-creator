@@ -7,10 +7,12 @@ STREAMLIT_UPLOAD_TYPES = ["csv", "xlsx", "xls"]
 CSV_ENCODING = "utf-8-sig"
 
 # Export as plain text (never scientific notation) — Excel reads long IDs as numbers otherwise.
-LONG_NUMERIC_ID_COLUMNS: frozenset[str] = frozenset({"External ID", "UPC Code"})
+# Keys match Excel header text after OUTPUT_HEADER_DISPLAY is applied.
+LONG_NUMERIC_ID_COLUMNS: frozenset[str] = frozenset({"External ID", "4.30.26 UPC Code"})
 
 # Narrow navy separator columns inserted in .xlsx after these headers (between groups).
-GROUP_SEPARATOR_AFTER_HEADERS: tuple[str, ...] = (
+# Anchors are NetSuite/upload column names; resolved to Excel labels via OUTPUT_HEADER_DISPLAY.
+GROUP_SEPARATOR_AFTER_UPLOAD_KEYS: tuple[str, ...] = (
     "NETSUITE LINK",
     "ASIN 4.30.26",
     " Amazon: Stock",
@@ -30,9 +32,156 @@ GROUP_SEPARATOR_COLUMN_WIDTH: float = 2.25
 HEADER_COLUMN_WIDTH_PX: float = 87
 HEADER_ROW_HEIGHT_PX: float = 146
 
-# Excel (.xlsx) header row fills — keys match OUTPUT_COLUMN_ORDER exactly (ARGB-ish hex, no #).
-# Palette aligned with format.xlsx / screenshots (dates in labels are ignored for matching).
-HEADER_FILL_HEX_BY_COLUMN: dict[str, str] = {
+# Upload column name → Excel row-1 header (adds snapshot dates from screenshots).
+OUTPUT_HEADER_DISPLAY: dict[str, str] = {}
+
+_BUY_BOX_5126 = (
+    " Buy Box: Is FBA",
+    " Buy Box Seller",
+    " Buy Box: Stock",
+    " Amazon: Current BUY BOX  Price",
+    " Buy Box Eligible Offer Counts: New FBA",
+    " Buy Box Eligible Offer Counts: New FBM",
+    " Amazon: Stock",
+    " Bought in past month",
+)
+for _k in _BUY_BOX_5126:
+    OUTPUT_HEADER_DISPLAY[_k] = "5.1.26 " + _k.strip()
+
+_ACTIVE_43026 = (
+    " ACTIVE/INACTIVE",
+    "FBM QTY",
+    "FBM PRICE",
+    " CURRENT SHIP TEMP (MIG-STANDARD, SHIP-ADD 9.99)",
+    " ACTIVE/INACTIVE.1",
+    "AMZ PRICE",
+    "AMZ TAG",
+)
+for _k in _ACTIVE_43026:
+    OUTPUT_HEADER_DISPLAY[_k] = "4.30.26 " + _k.strip()
+
+_REPRICING_43026 = (
+    "repricing_enabled FBA ",
+    "repricing_enabled MFN ",
+    "repricing_enabled FBM ",
+    "offer_position FBA ",
+    "offer_position MFN ",
+    "offer_position FBM ",
+    "min_price FBA ",
+    "min_price MFN ",
+    "min_price FBM ",
+    "max_price FBA ",
+    "max_price MFN ",
+    "max_price FBM ",
+    "current_price FBA ",
+    "current_price MFN ",
+    "current_price FBM ",
+    "current_shipping FBA ",
+    "current_shipping MFN ",
+    "current_shipping FBM ",
+    "featured FBA ",
+    "featured MFN ",
+    "featured FBM ",
+    "is_buy_box_winner FBA ",
+    "is_buy_box_winner MFN ",
+    "is_buy_box_winner FBM ",
+    "has_buy_box FBA ",
+    "has_buy_box MFN ",
+    "has_buy_box FBM ",
+)
+for _k in _REPRICING_43026:
+    OUTPUT_HEADER_DISPLAY[_k] = "4.30.26 " + _k
+
+_SUPPLY_43026 = (
+    " Total Days of Supply (including units from open shipments) ",
+    " Recommended replenishment qty",
+    "STORE INV ",
+    "STORE ON ORDER ",
+    "STORE MINS ",
+    "FC INV ",
+    "FC ON ORDER ",
+)
+for _k in _SUPPLY_43026:
+    _trail = " " if _k.endswith(" ") else ""
+    OUTPUT_HEADER_DISPLAY[_k] = "4.30.26 " + _k.strip() + _trail
+
+_INV_AGE_43026 = (
+    " inv-age-0-to-90-days",
+    " inv-age-91-to-180-days",
+    " inv-age-181-to-270-days",
+    " inv-age-271-to-365-days",
+    " inv-age-365-plus-days",
+)
+for _k in _INV_AGE_43026:
+    OUTPUT_HEADER_DISPLAY[_k] = "4.30.26 " + _k.strip()
+
+OUTPUT_HEADER_DISPLAY["Recomened Removel+"] = "4.30.26 Recomened Removel+"
+
+_AFN_UNSPACED = (
+    "afn-fulfillable-quantity",
+    "afn-unsellable-quantity",
+    "afn-reserved-quantity",
+    "afn-inbound-working-quantity",
+    "afn-inbound-shipped-quantity",
+    "afn-inbound-receiving-quantity",
+    "afn-researching-quantity (inbound inv.not avail. for sale)",
+)
+for _k in _AFN_UNSPACED:
+    OUTPUT_HEADER_DISPLAY[_k] = "4.30.26 " + _k
+
+_AFN_LEADING_SPACE = (
+    " afn-total-quantity",
+    " afn-fulfillable-quantity",
+    " afn-unsellable-quantity",
+    " afn-reserved-quantity",
+    " afn-inbound-working-quantity",
+    " afn-inbound-shipped-quantity",
+    " afn-inbound-receiving-quantity",
+)
+for _k in _AFN_LEADING_SPACE:
+    # Second AFN block — two spaces after the date so labels stay unique vs the unspaced block.
+    OUTPUT_HEADER_DISPLAY[_k] = "4.30.26  " + _k.strip()
+
+# Distinct from the unspaced afn-researching column after dating.
+OUTPUT_HEADER_DISPLAY[" afn-researching-quantity (inbound inv.not avail. for sale)"] = (
+    "4.30.26  afn-researching-quantity (inbound inv.not avail. for sale)"
+)
+
+OUTPUT_HEADER_DISPLAY["Reserved Customer Order"] = "4.30.26 Reserved Customer Order"
+
+_NS_TAIL_43026 = (
+    "UPC Code",
+    "Price Level",
+    "Unit Price",
+    "Current Price",
+    "Average Cost",
+    "Purchase Price",
+    "MSRP",
+    "Shipping Override",
+    "Location Reorder Point",
+    "Last Markdown Date",
+    "ITEM SID",
+    "Internal ID",
+    "EXCLUDE FROM AMAZON",
+    "EXCLUDE FROM EBAY",
+    "EXCLUDE FROM MSW.COM",
+    "Last Purchase Price",
+    "Amazon Minimum Price",
+    "AMAZON MAX PRICE",
+    "FBA STORAGE TYPE",
+    "Parent",
+    "SEND TO FBA",
+    "FBA ONLY",
+    "MAP RELEASE DATE.1",
+    "ASIN",
+    "AMZ SOURCING COST",
+)
+for _k in _NS_TAIL_43026:
+    OUTPUT_HEADER_DISPLAY[_k] = "4.30.26 " + _k
+
+# Excel (.xlsx) header row fills — keys match post-display header text (ARGB-ish hex, no #).
+# _RAW_HEADER_FILLS uses upload keys; HEADER_FILL_HEX_BY_COLUMN maps to dated labels.
+_RAW_HEADER_FILLS: dict[str, str] = {
     # Links — yellow
     "AMAZON LINK": "FFFF00",
     "SELLER CENTRAL LINK": "FFFF00",
@@ -151,7 +300,15 @@ HEADER_FILL_HEX_BY_COLUMN: dict[str, str] = {
     "AMZ SOURCING COST": "D9D9D9",
 }
 
-# Columns written to the export — matches ``format.xlsx`` header row (122 cols).
+HEADER_FILL_HEX_BY_COLUMN: dict[str, str] = {
+    OUTPUT_HEADER_DISPLAY.get(k, k): v for k, v in _RAW_HEADER_FILLS.items()
+}
+
+GROUP_SEPARATOR_AFTER_HEADERS: tuple[str, ...] = tuple(
+    OUTPUT_HEADER_DISPLAY.get(k, k) for k in GROUP_SEPARATOR_AFTER_UPLOAD_KEYS
+)
+
+# Columns written to the export — NetSuite/upload header strings (122 cols); Excel labels may differ.
 # Columns absent from the upload are emitted blank; order is preserved.
 OUTPUT_COLUMN_ORDER: tuple[str, ...] = (
     "External ID",

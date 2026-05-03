@@ -6,6 +6,8 @@ from collections.abc import Sequence
 
 import pandas as pd
 
+from .constants import OUTPUT_HEADER_DISPLAY
+
 
 def subset_columns(df: pd.DataFrame, selected: list[str]) -> pd.DataFrame:
     """Return df with only ``selected`` columns, preserving order."""
@@ -24,11 +26,14 @@ def dataframe_fixed_output(df: pd.DataFrame, preset: Sequence[str]) -> pd.DataFr
     """
     series_list: list[pd.Series] = []
     for name in preset:
+        label = OUTPUT_HEADER_DISPLAY.get(name, name)
         if name in df.columns:
-            series_list.append(df[name].copy())
+            s = df[name].copy()
+            s.name = label
+            series_list.append(s)
         else:
             series_list.append(
-                pd.Series("", index=df.index, dtype=object, name=name)
+                pd.Series("", index=df.index, dtype=object, name=label)
             )
     if not series_list:
         return pd.DataFrame(index=df.index)
