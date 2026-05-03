@@ -6,7 +6,7 @@ from collections.abc import Sequence
 
 import pandas as pd
 
-from .constants import OUTPUT_HEADER_DISPLAY
+from .constants import OUTPUT_COLUMN_ALIASES, OUTPUT_HEADER_DISPLAY
 
 
 def subset_columns(df: pd.DataFrame, selected: list[str]) -> pd.DataFrame:
@@ -15,6 +15,13 @@ def subset_columns(df: pd.DataFrame, selected: list[str]) -> pd.DataFrame:
     if missing:
         raise KeyError(f"Unknown columns: {missing}")
     return df.loc[:, list(selected)]
+
+
+def _source_column_for_preset(df: pd.DataFrame, preset_name: str) -> str | None:
+    for key in OUTPUT_COLUMN_ALIASES.get(preset_name, (preset_name,)):
+        if key in df.columns:
+            return str(key)
+    return None
 
 
 def dataframe_fixed_output(df: pd.DataFrame, preset: Sequence[str]) -> pd.DataFrame:
@@ -27,8 +34,9 @@ def dataframe_fixed_output(df: pd.DataFrame, preset: Sequence[str]) -> pd.DataFr
     series_list: list[pd.Series] = []
     for name in preset:
         label = OUTPUT_HEADER_DISPLAY.get(name, name)
-        if name in df.columns:
-            s = df[name].copy()
+        src = _source_column_for_preset(df, name)
+        if src is not None:
+            s = df[src].copy()
             s.name = label
             series_list.append(s)
         else:
@@ -43,6 +51,12 @@ def dataframe_fixed_output(df: pd.DataFrame, preset: Sequence[str]) -> pd.DataFr
 def preset_columns_present(preset: Sequence[str], df_columns: Sequence) -> tuple[list[str], list[str]]:
     """Return (present, missing) preset names relative to ``df`` column labels (as strings)."""
     col_set = {str(c) for c in df_columns}
-    present = [n for n in preset if n in col_set]
-    missing = [n for n in preset if n not in col_set]
+    present: list[str] = []
+    missing: list[str] = []
+    for n in preset:
+        aliases = OUTPUT_COLUMN_ALIASES.get(n, (n,))
+        if any(a in col_set for a in aliases):
+            present.append(n)
+        else:
+            missing.append(n)
     return present, missing

@@ -42,7 +42,7 @@ def render_app() -> None:
     st.title("Master Sheet Creator")
     st.caption(
         "Upload your NetSuite-style export (.xls XML, .xlsx, or .csv). "
-        "The download is always **Excel (.xlsx)** matching your **format.xlsx** layout (122 columns); "
+        "The download is always **Excel (.xlsx)** matching your **format.xlsx** layout (114 columns); "
         "fields not in the upload are left blank. **Every row** is included — previews are shortened."
     )
     _render_upload_flow()

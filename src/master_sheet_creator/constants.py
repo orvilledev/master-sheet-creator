@@ -21,7 +21,7 @@ GROUP_SEPARATOR_AFTER_UPLOAD_KEYS: tuple[str, ...] = (
     "has_buy_box FBM ",
     "AMZ SALES 4.19-4.25.26",
     "FC ON ORDER ",
-    "afn-researching-quantity (inbound inv.not avail. for sale)",
+    "Recomened Removel+",
     " afn-researching-quantity (inbound inv.not avail. for sale)",
 )
 # Dark navy blue bar (matches template separator column).
@@ -111,21 +111,10 @@ _INV_AGE_43026 = (
 for _k in _INV_AGE_43026:
     OUTPUT_HEADER_DISPLAY[_k] = "4.30.26 " + _k.strip()
 
-OUTPUT_HEADER_DISPLAY["Recomened Removel+"] = "4.30.26 Recomened Removel+"
+OUTPUT_HEADER_DISPLAY["Recomened Removel+"] = "4.30.26 Recomened Removal +"
 
-_AFN_UNSPACED = (
-    "afn-fulfillable-quantity",
-    "afn-unsellable-quantity",
-    "afn-reserved-quantity",
-    "afn-inbound-working-quantity",
-    "afn-inbound-shipped-quantity",
-    "afn-inbound-receiving-quantity",
-    "afn-researching-quantity (inbound inv.not avail. for sale)",
-)
-for _k in _AFN_UNSPACED:
-    OUTPUT_HEADER_DISPLAY[_k] = "4.30.26 " + _k
-
-_AFN_LEADING_SPACE = (
+# Single AFN block (after inv-age / removal) — matches reference layout; no duplicate metrics.
+_AF_SINGLE_BLOCK = (
     " afn-total-quantity",
     " afn-fulfillable-quantity",
     " afn-unsellable-quantity",
@@ -133,17 +122,10 @@ _AFN_LEADING_SPACE = (
     " afn-inbound-working-quantity",
     " afn-inbound-shipped-quantity",
     " afn-inbound-receiving-quantity",
+    " afn-researching-quantity (inbound inv.not avail. for sale)",
 )
-for _k in _AFN_LEADING_SPACE:
-    # Second AFN block — two spaces after the date so labels stay unique vs the unspaced block.
-    OUTPUT_HEADER_DISPLAY[_k] = "4.30.26  " + _k.strip()
-
-# Distinct from the unspaced afn-researching column after dating.
-OUTPUT_HEADER_DISPLAY[" afn-researching-quantity (inbound inv.not avail. for sale)"] = (
-    "4.30.26  afn-researching-quantity (inbound inv.not avail. for sale)"
-)
-
-OUTPUT_HEADER_DISPLAY["Reserved Customer Order"] = "4.30.26 Reserved Customer Order"
+for _k in _AF_SINGLE_BLOCK:
+    OUTPUT_HEADER_DISPLAY[_k] = "4.30.26 " + _k.strip()
 
 # Trailing NetSuite columns (UPC Code … AMZ SOURCING COST): no date prefix in Excel headers.
 
@@ -223,14 +205,6 @@ _RAW_HEADER_FILLS: dict[str, str] = {
     " inv-age-271-to-365-days": "FFC000",
     " inv-age-365-plus-days": "FF0000",
     "Recomened Removel+": "7030A0",
-    "12.15 afn-total-quantity": "FFFF00",
-    "afn-fulfillable-quantity": "C6EFCE",
-    "afn-unsellable-quantity": "FF0000",
-    "afn-reserved-quantity": "FFFFFF",
-    "afn-inbound-working-quantity": "FFFFFF",
-    "afn-inbound-shipped-quantity": "FFFFFF",
-    "afn-inbound-receiving-quantity": "FFFFFF",
-    "afn-researching-quantity (inbound inv.not avail. for sale)": "FFFFFF",
     " afn-total-quantity": "FFFF00",
     " afn-fulfillable-quantity": "C6EFCE",
     " afn-unsellable-quantity": "FF0000",
@@ -276,7 +250,7 @@ GROUP_SEPARATOR_AFTER_HEADERS: tuple[str, ...] = tuple(
     OUTPUT_HEADER_DISPLAY.get(k, k) for k in GROUP_SEPARATOR_AFTER_UPLOAD_KEYS
 )
 
-# Columns written to the export — NetSuite/upload header strings (122 cols); Excel labels may differ.
+# Columns written to the export — NetSuite/upload header strings (114 cols); Excel labels may differ.
 # Columns absent from the upload are emitted blank; order is preserved.
 OUTPUT_COLUMN_ORDER: tuple[str, ...] = (
     "External ID",
@@ -359,14 +333,6 @@ OUTPUT_COLUMN_ORDER: tuple[str, ...] = (
     " inv-age-271-to-365-days",
     " inv-age-365-plus-days",
     "Recomened Removel+",
-    "12.15 afn-total-quantity",
-    "afn-fulfillable-quantity",
-    "afn-unsellable-quantity",
-    "afn-reserved-quantity",
-    "afn-inbound-working-quantity",
-    "afn-inbound-shipped-quantity",
-    "afn-inbound-receiving-quantity",
-    "afn-researching-quantity (inbound inv.not avail. for sale)",
     " afn-total-quantity",
     " afn-fulfillable-quantity",
     " afn-unsellable-quantity",
@@ -402,3 +368,18 @@ OUTPUT_COLUMN_ORDER: tuple[str, ...] = (
     "ASIN",
     "AMZ SOURCING COST",
 )
+
+# First match wins: coalesce legacy duplicate NetSuite field names into one output column.
+OUTPUT_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
+    " afn-total-quantity": ("12.15 afn-total-quantity", " afn-total-quantity"),
+    " afn-fulfillable-quantity": (" afn-fulfillable-quantity", "afn-fulfillable-quantity"),
+    " afn-unsellable-quantity": (" afn-unsellable-quantity", "afn-unsellable-quantity"),
+    " afn-reserved-quantity": (" afn-reserved-quantity", "afn-reserved-quantity"),
+    " afn-inbound-working-quantity": (" afn-inbound-working-quantity", "afn-inbound-working-quantity"),
+    " afn-inbound-shipped-quantity": (" afn-inbound-shipped-quantity", "afn-inbound-shipped-quantity"),
+    " afn-inbound-receiving-quantity": (" afn-inbound-receiving-quantity", "afn-inbound-receiving-quantity"),
+    " afn-researching-quantity (inbound inv.not avail. for sale)": (
+        " afn-researching-quantity (inbound inv.not avail. for sale)",
+        "afn-researching-quantity (inbound inv.not avail. for sale)",
+    ),
+}
